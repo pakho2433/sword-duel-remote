@@ -6,7 +6,12 @@ import { Timer } from 'three/addons/misc/Timer.js';
 
 const $ = (id) => document.getElementById(id);
 const BASE = location.href.replace(/[^/]*(\?.*)?(#.*)?$/, '');
-const TURNS = 12, CHOP_TIME = 4.0, BLOCK_WIN = 1.1;
+const TURNS = 12, CHOP_TIME = 4.0, BLOCK_BASE = 1.1;
+const JOIN = (new URLSearchParams(location.search).get('join') || '').toUpperCase();
+const IS_GUEST = !!JOIN; // guest screen in online remote mode: mirrors the host, relays 2P input
+let BLOCK_WIN = BLOCK_BASE;
+let guestConn = null, guestRtt = 0; // host side
+function emit(ev, data = {}) { if (guestConn && guestConn.open) try { guestConn.send({ t: 'g', ev, ...data }); } catch (e) {} }
 const DIRS = { L: '⬅️', T: '⬆️', R: '➡️' };
 
 // ---------------- Three.js scene ----------------
@@ -156,10 +161,11 @@ function hud() {
 function broadcast() { for (const p of [1, 2]) send(p, { t: 'state', role: state.attacker === p ? 'atk' : 'def', phase: state.phase, score: [state.score[1], state.score[2]], turn: state.turn, turns: TURNS }); }
 
 function startMatch() {
-  unlockAudio();
+  unlockAudio(); emit('start');
+  BLOCK_WIN = state.mode === 'remote' ? BLOCK_BASE + 0.15 + Math.min(0.25, guestRtt / 2000) : BLOCK_BASE;
   state.turn = 0; state.score = { 1: 0, 2: 0 }; state.attacker = 1; state.log = [];
   $('lobby').classList.add('hidden'); $('result').classList.add('hidden'); $('hud').classList.remove('hidden');
-  $('touch').classList.toggle('hidden', state.mode !== 'local');
+  touchFor();
   for (const p of [1, 2]) { fighters[p].hold = false; fighters[p].play('2H_Melee_Idle'); }
   sfx.gong();
   setBanner('準備！', 1200, '#ffd54a');
@@ -169,6 +175,7 @@ function nextTurn(delay = 0) {
   state.phase = 'wait'; state.t = delay; hud(); broadcast();
 }
 function beginChopWindow() {
+  emit('chopwin');
   state.phase = 'chop'; state.t = CHOP_TIME; state.chopDir = null; state.early = { 1: 0, 2: 0 };
   hud(); broadcast();
   setBanner(state.attacker === 1 ? '🛡️ ⚔️ 劈！' : '🪓 ⚔️ 劈！', 900, state.attacker === 1 ? '#7fb2ff' : '#ff8a8a');
@@ -176,6 +183,7 @@ function beginChopWindow() {
 }
 const ATK_CLIP = { L: '1H_Melee_Attack_Slice_Diagonal', R: '1H_Melee_Attack_Slice_Horizontal', T: '1H_Melee_Attack_Chop' };
 function doChop(dir) {
+  emit('chop', { dir, win: BLOCK_WIN });
   const a = fighters[state.attacker];
   state.phase = 'block'; state.chopDir = dir; state.t = BLOCK_WIN; state.blockDir = null;
   a.play(ATK_CLIP[dir], { once: true, speed: 0.75 }); a.lunge = 1;
@@ -186,12 +194,14 @@ function doChop(dir) {
   broadcast(); send(other(state.attacker), { t: 'incoming', dir });
 }
 function input(p, dir, src = 'key') {
+  if (IS_GUEST) { if (hostConn && hostConn.open) hostConn.send({ t: 'act', dir, src: 'guest-' + src }); return; }
   state.log.push({ p, dir, src, phase: state.phase });
   if (state.phase === 'chop' && p === state.attacker) return doChop(dir);
   if (state.phase === 'chop' && p !== state.attacker) { state.early[p] = 0.35; return; } // early block ignored
   if (state.phase === 'block' && p !== state.attacker && !state.blockDir) { resolve(dir); }
 }
 function resolve(blockDir) {
+  emit('res', { blockDir: blockDir || null });
   const A = state.attacker, D = other(A); const a = fighters[A], d = fighters[D];
   state.blockDir = blockDir || null;
   const ok = blockDir === state.chopDir;
@@ -212,13 +222,15 @@ function resolve(blockDir) {
   hud(); broadcast();
 }
 function afterResult() {
+  emit('next');
   state.turn++;
-  if (state.turn >= TURNS) return endMatch();
+  if (state.turn >= TURNS) return IS_GUEST ? null : endMatch();
   state.attacker = other(state.attacker);
   setBanner('🔄', 600);
   nextTurn(0.7);
 }
 function endMatch() {
+  emit('over');
   state.phase = 'over'; hud(); broadcast();
   const s = state.score; const w = s[1] > s[2] ? 1 : s[2] > s[1] ? 2 : 0;
   for (const p of [1, 2]) { fighters[p].hold = true; fighters[p].play(w === 0 || w === p ? 'Cheer' : 'Sit_Floor_Down', { once: w !== p && w !== 0 }); }
@@ -232,7 +244,7 @@ function endMatch() {
 
 // ---------------- input: keyboard + touch ----------------
 const KEYS = { a: [1, 'L'], s: [1, 'T'], d: [1, 'R'], j: [2, 'L'], k: [2, 'T'], l: [2, 'R'], w: [1, 'T'], i: [2, 'T'] };
-addEventListener('keydown', (e) => { const k = KEYS[e.key.toLowerCase()]; if (k && !e.repeat) input(k[0], k[1], 'key'); if (e.key === 'Enter' && state.phase === 'lobby') startMatch(); });
+addEventListener('keydown', (e) => { const k = KEYS[e.key.toLowerCase()]; if (k && !e.repeat) input(state.mode === 'remote' && !IS_GUEST ? 1 : k[0], k[1], 'key'); if (e.key === 'Enter' && state.phase === 'lobby') $('start').onclick(); });
 document.querySelectorAll('#touch button').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); unlockAudio(); input(+b.dataset.p, b.dataset.d, 'touch'); }));
 
 // ---------------- networking (PeerJS) ----------------
@@ -247,18 +259,26 @@ function startPeer() {
   code = code.toUpperCase(); sessionStorage.setItem('sdr-room', code);
   state.room = code; $('roomcode').textContent = code;
   for (const p of [1, 2]) qr($('qr' + p), `${BASE}controller.html?room=${code}&p=${p}`);
+  const share = `${BASE}index.html?join=${code}`; qr($('qrShare'), share); $('shareLink').textContent = share; $('shareLink').href = share;
   peer = new Peer('sdr-' + code, { debug: 0 });
   peer.on('open', () => { $('netst').textContent = '🟢'; state.peerOpen = true; });
   peer.on('connection', (c) => {
     c.on('open', () => {});
     c.on('data', (m) => {
       if (!m || typeof m !== 'object') return;
+      if (m.t === 'hello' && m.screen) { if (guestConn && guestConn !== c) try { guestConn.close(); } catch (e) {} guestConn = c; c._guest = true; document.querySelectorAll('#dg,#dgH').forEach((x)=>x.classList.add('on')); sfx.ding(); c.send({ t: 'snap', ...snap(), sync: true }); return; }
+      if (c._guest) {
+        if (m.t === 'gpr') { guestRtt = performance.now() - m.ts; $('ping').textContent = '📶 ' + Math.round(guestRtt) + 'ms'; }
+        if (m.t === 'act' && 'LTR'.includes(m.dir)) input(2, m.dir, m.src);
+        if (m.t === 'start' && (state.phase === 'lobby' || state.phase === 'over')) startMatch();
+        return;
+      }
       if (m.t === 'hello') { const p = m.p === 2 ? 2 : 1; if (conns[p] && conns[p] !== c) try { conns[p].close(); } catch (e) {} conns[p] = c; c._p = p; lastSeen[p] = performance.now(); setDot(p, true); sfx.ding(); broadcast(); return; }
       const p = c._p; if (!p) return; lastSeen[p] = performance.now();
       if (m.t === 'act' && 'LTR'.includes(m.dir)) input(p, m.dir, m.src || 'phone');
       if (m.t === 'start' && (state.phase === 'lobby' || state.phase === 'over')) startMatch();
     });
-    c.on('close', () => { if (c._p && conns[c._p] === c) { conns[c._p] = null; setDot(c._p, false); } });
+    c.on('close', () => { if (c === guestConn) { guestConn = null; document.querySelectorAll('#dg,#dgH').forEach((x)=>x.classList.remove('on')); $('ping').textContent = '📶 ❌'; } if (c._p && conns[c._p] === c) { conns[c._p] = null; setDot(c._p, false); } });
     c.on('error', () => {});
   });
   peer.on('disconnected', () => { $('netst').textContent = '🟠'; setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); });
@@ -272,9 +292,23 @@ setInterval(() => { const now = performance.now(); for (const p of [1, 2]) { if 
 
 // ---------------- lobby UI ----------------
 $('mPhone').onclick = () => { state.mode = 'phone'; $('mPhone').classList.add('on'); $('mLocal').classList.remove('on'); $('phonePane').classList.remove('hidden'); $('localPane').classList.add('hidden'); };
-$('mLocal').onclick = () => { state.mode = 'local'; $('mLocal').classList.add('on'); $('mPhone').classList.remove('on'); $('localPane').classList.remove('hidden'); $('phonePane').classList.add('hidden'); };
-$('start').onclick = startMatch; $('again').onclick = startMatch;
-$('toLobby').onclick = () => { state.phase = 'lobby'; $('result').classList.add('hidden'); $('hud').classList.add('hidden'); $('lobby').classList.remove('hidden'); for (const p of [1, 2]) { fighters[p].hold = false; fighters[p].play('2H_Melee_Idle'); } broadcast(); };
+function setMode(m) {
+  state.mode = m;
+  for (const [id, mm] of [['mPhone', 'phone'], ['mLocal', 'local'], ['mRemote', 'remote']]) $(id).classList.toggle('on', m === mm);
+  $('phonePane').classList.toggle('hidden', m === 'local'); $('localPane').classList.toggle('hidden', m !== 'local');
+  $('remotePane').classList.toggle('hidden', m !== 'remote'); $('qrcard2').classList.toggle('hidden', m === 'remote');
+  $('ping').classList.toggle('hidden', m !== 'remote'); document.body.classList.toggle('remote', m === 'remote'); $('qrcardS').classList.toggle('hidden', m !== 'remote' || IS_GUEST);
+}
+function touchFor() { const on = state.mode === 'local' || state.mode === 'remote'; $('touch').classList.toggle('hidden', !on || state.phase === 'lobby' || state.phase === 'over');
+  document.querySelector('#touch .half.p1').style.visibility = state.mode === 'remote' && IS_GUEST ? 'hidden' : 'visible';
+  document.querySelector('#touch .half.p2').style.visibility = state.mode === 'remote' && !IS_GUEST ? 'hidden' : 'visible'; }
+$('mRemote').onclick = () => setMode('remote');
+$('mPhone').onclick = () => setMode('phone');
+$('mLocal').onclick = () => setMode('local');
+const startBtn = () => { if (IS_GUEST) { unlockAudio(); hostConn && hostConn.open && hostConn.send({ t: 'start' }); } else startMatch(); };
+$('start').onclick = startBtn; $('again').onclick = startBtn;
+$('toLobby').onclick = () => { if (IS_GUEST) return; emit('lobby'); toLobbyView(); };
+function toLobbyView() { state.phase = 'lobby'; touchFor(); $('result').classList.add('hidden'); $('hud').classList.add('hidden'); $('lobby').classList.remove('hidden'); for (const p of [1, 2]) { fighters[p].hold = false; fighters[p].play('2H_Melee_Idle'); } broadcast(); }
 if (new URLSearchParams(location.search).get('mode') === 'local') $('mLocal').onclick();
 
 // ---------------- loop ----------------
@@ -286,7 +320,8 @@ renderer.setAnimationLoop((ts) => {
   timer.update(ts); const dt = Math.min(timer.getDelta(), 0.05); tAcc += dt;
   for (const p of [1, 2]) { const f = fighters[p]; if (!f) continue; f.mixer.update(dt); f.lunge = Math.max(0, f.lunge - dt * 1.4); const dirx = p === 1 ? 1 : -1; f.root.position.x = f.baseX + dirx * Math.sin(Math.min(1, f.lunge) * Math.PI) * 0.35; }
   // phases
-  if (state.phase === 'wait') { state.t -= dt; if (state.t <= 0) beginChopWindow(); }
+  if (IS_GUEST) { if (state.t > 0) state.t -= dt; if (state.phase === 'chop') $('timerfill').style.width = (100 * state.t / CHOP_TIME) + '%'; if (state.phase === 'block') $('timerfill').style.width = (100 * state.t / BLOCK_WIN) + '%'; }
+  else if (state.phase === 'wait') { state.t -= dt; if (state.t <= 0) beginChopWindow(); }
   else if (state.phase === 'chop') { state.t -= dt; $('timerfill').style.width = (100 * state.t / CHOP_TIME) + '%'; if (state.t <= 0) doChop('LTR'[Math.floor(Math.random() * 3)]); }
   else if (state.phase === 'block') { state.t -= dt; $('timerfill').style.width = (100 * state.t / BLOCK_WIN) + '%'; if (state.t <= 0) resolve(null); }
   else if (state.phase === 'result') { state.t -= dt; if (state.t <= 0) afterResult(); }
@@ -304,4 +339,64 @@ renderer.setAnimationLoop((ts) => {
 });
 
 loadFighters().then(() => { $('loading').remove(); state.ready = true; }).catch((e) => { console.error(e); $('loading').textContent = '⚠️ ' + e.message; });
-startPeer();
+
+// ---------------- online remote mode ----------------
+function snap() { return { phase: state.phase, turn: state.turn, attacker: state.attacker, score: state.score, conn: state.conn, rtt: guestRtt, win: BLOCK_WIN }; }
+setInterval(() => { if (!guestConn || !guestConn.open) return; emit('ping'); try { guestConn.send({ t: 'gping', ts: performance.now() }); guestConn.send({ t: 'snap', ...snap() }); } catch (e) {} }, 1000);
+setInterval(() => { if (guestConn && guestConn.open) try { guestConn.send({ t: 'snap', ...snap() }); } catch (e) {} }, 250);
+let hostConn = null, hostPeer = null, hostRetry = null, hostLast = 0;
+function startGuest() {
+  state.mode = 'remote'; state.room = JOIN;
+  document.body.classList.add('guest');
+  $('mPhone').classList.add('hidden'); $('mLocal').classList.add('hidden'); setMode('remote');
+  $('remoteHost').classList.add('hidden'); $('remoteGuest').classList.remove('hidden');
+  $('qrcard1').classList.add('hidden'); $('qrcard2').classList.remove('hidden');
+  $('roomcode').textContent = JOIN;
+  qr($('qr2'), `${BASE}controller.html?room=${JOIN}&p=2`);
+  const go = () => {
+    clearTimeout(hostRetry);
+    if (!hostPeer || hostPeer.destroyed) {
+      hostPeer = new Peer({ debug: 0 });
+      hostPeer.on('open', () => { state.peerOpen = true; $('netst').textContent = '🟢'; go(); });
+      hostPeer.on('disconnected', () => { try { hostPeer.reconnect(); } catch (e) {} });
+      hostPeer.on('error', (e) => { console.warn('guest peer', e.type); setHost(false); hostRetry = setTimeout(() => { if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)) { try { hostPeer.destroy(); } catch (x) {} hostPeer = null; } go(); }, 2000); });
+      return;
+    }
+    if (!hostPeer.open) return;
+    const c = hostPeer.connect('sdr-' + JOIN, { reliable: true }); hostConn = c;
+    c.on('open', () => { if (hostConn !== c) return; c.send({ t: 'hello', screen: true }); hostLast = Date.now(); setHost(true); });
+    c.on('data', onHostMsg);
+    c.on('close', () => { if (hostConn !== c) return; setHost(false); hostRetry = setTimeout(go, 1500); });
+  };
+  setInterval(() => { if (state.hostOk && Date.now() - hostLast > 6000) { setHost(false); try { hostConn.close(); } catch (e) {} hostConn = null; go(); } }, 2000);
+  go();
+}
+function setHost(v) { state.hostOk = v; document.querySelectorAll('#dg,#dgH').forEach((x)=>x.classList.toggle('on', v)); if (!v) $('ping').textContent = '📶 ❌'; }
+function onHostMsg(m) {
+  hostLast = Date.now();
+  if (m.t === 'gping') { hostConn.send({ t: 'gpr', ts: m.ts }); return; }
+  if (m.t === 'snap') {
+    $('ping').textContent = '📶 ' + Math.round(m.rtt || 0) + 'ms';
+    for (const p of [1, 2]) setDot(p, !!m.conn[p]);
+    if (m.win) BLOCK_WIN = m.win;
+    const inMatch = !['lobby', 'over'].includes(m.phase);
+    if (m.sync || (inMatch && state.phase === 'lobby')) { // (re)joined mid-match: jump to host state
+      if (inMatch) { $('lobby').classList.add('hidden'); $('result').classList.add('hidden'); $('hud').classList.remove('hidden'); }
+      state.phase = m.phase === 'block' ? 'wait' : m.phase;
+    }
+    state.score = { 1: m.score[1], 2: m.score[2] }; state.turn = m.turn; state.attacker = m.attacker; if (inMatch) { hud(); touchFor(); }
+    return;
+  }
+  if (m.t !== 'g') return;
+  switch (m.ev) {
+    case 'start': startMatch(); break;
+    case 'chopwin': beginChopWindow(); break;
+    case 'chop': BLOCK_WIN = m.win || BLOCK_WIN; doChop(m.dir); break;
+    case 'res': if (state.phase !== 'block') { state.chopDir = state.chopDir || 'T'; } resolve(m.blockDir); break;
+    case 'next': afterResult(); break;
+    case 'over': endMatch(); break;
+    case 'lobby': toLobbyView(); break;
+  }
+}
+
+if (IS_GUEST) startGuest(); else startPeer();

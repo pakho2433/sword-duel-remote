@@ -17,7 +17,7 @@
 <!-- HUD -->
 <div id="hud" class="hidden">
   <div class="pbox p1"><div class="ava">🛡️</div><div class="score" id="s1">0</div><div class="role" id="r1"></div></div>
-  <div class="mid"><div id="turn">1/12</div><div id="timerbar"><div id="timerfill"></div></div></div>
+  <div class="mid"><div id="turn">1/12</div><div id="ping" class="hidden">📶</div><div id="timerbar"><div id="timerfill"></div></div></div>
   <div class="pbox p2"><div class="role" id="r2"></div><div class="score" id="s2">0</div><div class="ava">🪓</div></div>
 </div>
 <div id="arrow" class="hidden"></div>
@@ -29,14 +29,22 @@
   <div class="modes">
     <button id="mPhone" class="mode on">📱📱</button>
     <button id="mLocal" class="mode">⌨️ / 👆</button>
+    <button id="mRemote" class="mode">🌐 遠程對戰</button>
   </div>
   <div id="phonePane">
     <div class="qrs">
-      <div class="qrcard p1"><div class="qrimg" id="qr1"></div><div class="lab">1P 🛡️ <span class="dot" id="d1"></span></div></div>
-      <div class="qrcard p2"><div class="qrimg" id="qr2"></div><div class="lab">2P 🪓 <span class="dot" id="d2"></span></div></div>
+      <div class="qrcard p1" id="qrcard1"><div class="qrimg" id="qr1"></div><div class="lab">1P 🛡️ <span class="dot" id="d1"></span></div></div>
+      <div class="qrcard share hidden" id="qrcardS"><div class="qrimg" id="qrShare"></div><div class="lab">🌐 對手畫面 <span class="dot" id="dgH"></span></div></div>
+      <div class="qrcard p2" id="qrcard2"><div class="qrimg" id="qr2"></div><div class="lab">2P 🪓 <span class="dot" id="d2"></span></div></div>
     </div>
     <div class="code">房間 <b id="roomcode">----</b> <span id="netst" class="net">⏳</span></div>
     <div class="hint">pakho2433.github.io/sword-duel-remote/controller.html</div>
+  </div>
+  <div id="remotePane" class="hidden">
+    <div id="remoteHost" class="rbox">
+      <div class="rtxt">📤 傳俾對手（iPad / 電腦）<br><a id="shareLink" target="_blank"></a></div></div>
+    <div id="remoteGuest" class="rbox hidden"><div class="rtxt">🌐 已加入 · 你係 2P 🪓</div></div>
+    <div class="rtxt">🌐 <span class="dot" id="dg"></span></div>
   </div>
   <div id="localPane" class="hidden">
     <div class="keys"><div class="k p1">1P 🛡️<br><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><br>⬅️ ⬆️ ➡️</div><div class="k p2">2P 🪓<br><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><br>⬅️ ⬆️ ➡️</div></div>

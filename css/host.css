@@ -43,3 +43,11 @@ kbd{display:inline-block;background:#fff;color:#222;border-radius:8px;padding:4p
 .half.p1 button{background:#3b82f6cc}.half.p2 button{background:#ef4444cc}
 .half button:active{transform:scale(.9)}
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:60px;background:#87c6f0}
+.rbox{display:flex;gap:14px;align-items:center;justify-content:center;margin-top:10px}
+.qrcard.share{border-color:#a855f7}.qrimg.sm{width:clamp(100px,14vw,150px);height:clamp(100px,14vw,150px)}
+.rtxt{font-size:18px;margin-top:6px;max-width:340px;word-break:break-all}.rtxt a{color:#ffd54a;font-size:14px}
+#ping{font-size:16px;background:#0006;border-radius:10px;margin-top:4px;padding:2px 8px}
+#remotePane .dot{width:16px;height:16px}
+.remote .rules small,.remote #phonePane .hint{display:none}
+.remote .qrimg{width:clamp(110px,17vw,170px);height:clamp(110px,17vw,170px)}
+.remote .rules{margin:6px 0 2px;font-size:18px}.remote .rbox{margin-top:4px}
