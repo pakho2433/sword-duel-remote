@@ -172,7 +172,7 @@ function startMatch() {
   nextTurn(1.4);
 }
 function nextTurn(delay = 0) {
-  state.phase = 'wait'; state.t = delay; hud(); broadcast();
+  state.phase = 'wait'; state.t = delay; hud(); broadcast(); touchFor();
 }
 function beginChopWindow() {
   emit('chopwin');
