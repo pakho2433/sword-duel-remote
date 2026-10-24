@@ -15,7 +15,7 @@ body.good{animation:flashG .5s}body.bad{animation:flashR .5s}
 @keyframes flashR{0%{box-shadow:inset 0 0 0 40px #fff}100%{box-shadow:inset 0 0 0 0 #fff}}
 #top{display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 16px 6px;font-size:26px;font-weight:bold}
 #conn{font-size:22px}
-#role{text-align:center;font-size:90px;margin-top:4px;line-height:1.1}
+#role{text-align:center;font-size:70px;margin-top:0;line-height:1.1}
 #roleTxt{text-align:center;font-size:30px;font-weight:900;min-height:40px}
 #incoming{text-align:center;font-size:30px;min-height:44px}
 #score{text-align:center;font-size:24px;opacity:.9}
@@ -23,16 +23,23 @@ body.good{animation:flashG .5s}body.bad{animation:flashR .5s}
 #pad button{font-size:64px;border-radius:26px;border:5px solid #fff;background:#ffffff2a;color:#fff;box-shadow:0 8px 0 #0005}
 #pad button:active,#pad button.hit{transform:translateY(6px);box-shadow:0 2px 0 #0005;background:#ffd54a88}
 #bT{grid-column:1/3}
-#motion{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(44vh + 30px);font-size:22px;padding:10px 22px;border-radius:30px;border:3px solid #fff;background:#0004;color:#fff}
+#motion{position:absolute;left:12px;top:calc(env(safe-area-inset-top) + 50px);font-size:18px;padding:6px 12px;border-radius:30px;border:3px solid #fff;background:#0004;color:#fff}
 #motion.on{background:#22c55e88}
 #overlay{position:fixed;inset:0;background:#000c;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:30px;gap:16px;text-align:center;z-index:9}
 #overlay input{font-size:40px;width:6em;text-align:center;letter-spacing:8px;border-radius:14px;border:0;padding:8px;text-transform:uppercase}
 #overlay button,#startBtn{font-size:30px;padding:12px 36px;border-radius:18px;border:0;background:#ffd54a;color:#4a2b00;font-weight:bold}
-#startBtn{position:absolute;left:50%;top:36%;z-index:3;transform:translateX(-50%)}
+#startBtn{position:absolute;left:50%;top:345px;transform:translateX(-50%);z-index:3}
 .hidden{display:none!important}
 #swingFx{position:fixed;inset:0;pointer-events:none;font-size:160px;display:flex;align-items:center;justify-content:center;opacity:0}
 #swingFx.show{animation:sw .45s}
 @keyframes sw{0%{opacity:1;transform:scale(.5)}100%{opacity:0;transform:scale(1.4)}}
+#calib{position:absolute;left:16px;right:16px;top:200px;background:#0004;border-radius:18px;padding:8px 12px;text-align:center}
+.ct{font-size:20px}#meter{position:relative;height:22px;background:#0006;border-radius:12px;overflow:hidden;margin:6px 0}
+#meterFill{height:100%;width:0;background:#ffd54a;transition:width .05s}#mline{position:absolute;left:80%;top:0;bottom:0;width:3px;background:#fff}
+.crow{display:flex;justify-content:space-between;align-items:center}#lastSwing{font-size:36px}#lastSwing.pop{animation:sw2 .4s}
+@keyframes sw2{0%{transform:scale(1.8)}100%{transform:scale(1)}}
+#sens button{font-size:22px;padding:4px 10px;margin-left:4px;border-radius:10px;border:2px solid #fff6;background:#0003}#sens button.on{background:#ffd54a;border-color:#fff}
+#guard{position:absolute;right:16px;top:calc(env(safe-area-inset-top) + 48px);font-size:30px}
 </style>
 </head>
 <body>
@@ -41,6 +48,8 @@ body.good{animation:flashG .5s}body.bad{animation:flashR .5s}
 <div id="roleTxt"></div>
 <div id="incoming"></div>
 <div id="score"></div>
+<div id="calib"><div class="ct">📳 揮一揮測試</div><div id="meter"><div id="meterFill"></div><div id="mline"></div></div><div class="crow"><span id="lastSwing">·</span><span id="sens"><button data-s="1">🐢</button><button data-s="2">🙂</button><button data-s="3">💪</button></span></div></div>
+<div id="guard"></div>
 <button id="startBtn" class="hidden">▶ 開始</button>
 <button id="motion">📳 揮動手機</button>
 <div id="pad">

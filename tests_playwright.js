@@ -2,6 +2,18 @@ const { chromium, devices } = require('playwright');
 const BASE = process.argv[2] || 'https://pakho2433.github.io/sword-duel-remote/';
 const OUT = '/workspace/sword-duel-remote/previews/';
 const errors = [];
+const SIM = () => {
+  const fire = (x, y, z, ra, rb, rg) => window.dispatchEvent(new DeviceMotionEvent('devicemotion', { acceleration: { x, y, z }, accelerationIncludingGravity: { x, y: y - 9.8, z }, rotationRate: { alpha: ra, beta: rb, gamma: rg }, interval: 16 }));
+  window.__swing = async (dir) => { // ~20 samples of a real arm swing: ramp up, peak, decelerate
+    for (let i = 0; i < 20; i++) { const env = Math.sin(Math.PI * i / 20) * (i < 14 ? 1 : -0.6); const s = dir === 'L' ? -1 : 1;
+      if (dir === 'T') fire(1.5 * env, -16 * env, 6 * env, 20, 320 * env, 10); else fire(s * 17 * env, 2 * env, 3 * env, -s * 250 * env, 20, 30);
+      await new Promise((r) => setTimeout(r, 16)); }
+  };
+  window.__hold = async (dir) => { window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: dir === 'T' ? 75 : 40, gamma: dir === 'L' ? -45 : dir === 'R' ? 45 : 0 }));
+    for (let i = 0; i < 20; i++) { fire(0.2, 0.1, 0.1, 2, 3, 1); await new Promise((r) => setTimeout(r, 16)); }
+    (async () => { for (let i = 0; i < 150; i++) { fire(0.2, 0.1, 0.1, 2, 3, 1); await new Promise((r) => setTimeout(r, 16)); } })(); };
+};
+
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const watch = (pg, name) => { pg.on('console', (m) => { if (m.type() === 'error') errors.push(`${name}: ${m.text()}`); }); pg.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`)); };
@@ -16,12 +28,13 @@ const errors = [];
   const iphone = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: devices['iPhone 13'].userAgent, permissions: ['accelerometer', 'gyroscope'] };
   const ctl = {};
   for (const p of [1, 2]) {
-    const c = await browser.newContext(iphone); const pg = await c.newPage(); watch(pg, 'ctl' + p);
+    const c = await browser.newContext(iphone); await c.addInitScript(SIM); const pg = await c.newPage(); watch(pg, 'ctl' + p);
     await pg.goto(`${BASE}controller.html?room=${room}&p=${p}`);
     ctl[p] = pg;
   }
   await host.waitForFunction(() => window.__game.conn[1] && window.__game.conn[2], null, { timeout: 45000 });
   console.log('both connected');
+  await ctl[1].tap('#motion'); await ctl[1].evaluate(() => window.__swing('R')); await ctl[1].waitForTimeout(200); await ctl[1].screenshot({ path: OUT + '3b-controller-swing-meter.png' }); console.log('test swing', JSON.stringify(await ctl[1].evaluate(() => window.__ctl.lastMotion)));
   await host.waitForTimeout(500);
   await host.screenshot({ path: OUT + '2-lobby-connected.png' });
   await ctl[1].screenshot({ path: OUT + '3-controller-p1-lobby.png' });
@@ -38,17 +51,19 @@ const errors = [];
       turnsSeen.add(g.turn); i++;
       const dir = 'LTR'[i % 3];
       const a = ctl[g.atk], d = ctl[g.atk === 1 ? 2 : 1];
+      if (i % 5 === 4) await d.evaluate((dir) => window.__hold(dir), dir);
       await a.waitForTimeout(300);
       if (i % 3 === 0) { // motion swing on the attacker
-        await a.evaluate((dir) => { const x = dir === 'L' ? -25 : dir === 'R' ? 25 : 2; const y = dir === 'T' ? -28 : 1; window.dispatchEvent(new DeviceMotionEvent('devicemotion', { acceleration: { x, y, z: 1 }, accelerationIncludingGravity: { x, y: y - 9.8, z: 1 }, rotationRate: { alpha: 0, beta: 0, gamma: 0 }, interval: 16 })); }, dir);
+        await a.evaluate((dir) => window.__swing(dir), dir);
         motionUsed++;
       } else await a.tap('#b' + dir);
-      await host.waitForFunction(() => window.__game.phase === 'block', null, { timeout: 5000 }).catch(async (e) => { console.log('DBG', JSON.stringify(await host.evaluate(() => ({ ph: window.__game.phase, log: window.__game.log.slice(-3) }))), JSON.stringify(await a.evaluate(() => window.__ctl))); throw e; });
+      await host.waitForFunction(() => window.__game.phase !== 'chop', null, { timeout: 5000 }).catch(async (e) => { console.log('DBG', JSON.stringify(await host.evaluate(() => ({ ph: window.__game.phase, log: window.__game.log.slice(-3) }))), JSON.stringify(await a.evaluate(() => window.__ctl))); throw e; });
       if (shots === 0) { await host.waitForTimeout(250); await host.screenshot({ path: OUT + '4-chop-telegraph.png' }); await d.screenshot({ path: OUT + '5-controller-defender.png' }); await a.screenshot({ path: OUT + '5b-controller-attacker.png' }); }
       const bdir = i % 4 === 1 ? 'LTR'[(i + 1) % 3] : dir; // sometimes wrong block
       await d.waitForTimeout(250);
-      if (i % 5 === 2) await d.evaluate((dir) => { const x = dir === 'L' ? -22 : dir === 'R' ? 22 : 1; const y = dir === 'T' ? -26 : 1; window.dispatchEvent(new DeviceMotionEvent('devicemotion', { acceleration: { x, y, z: 0 }, rotationRate: { alpha: 0, beta: 0, gamma: 0 }, interval: 16 })); }, bdir), motionUsed++;
-      else await d.tap('#b' + bdir);
+      if (i % 5 === 2) await d.evaluate((dir) => window.__swing(dir), bdir), motionUsed++;
+      else if (i % 5 === 4) { motionUsed++; }
+      else if (i % 5 !== 4) await d.tap('#b' + bdir);
       await host.waitForFunction(() => window.__game.phase !== 'block', null, { timeout: 5000 }); const lg = await host.evaluate(() => window.__game.log.slice(-2)); console.log('turn', g.turn, JSON.stringify(lg), await host.evaluate(() => window.__game.blockDir));
       if (shots < 2) { await host.waitForTimeout(350); await host.screenshot({ path: OUT + `6-result-${shots}.png` }); }
       shots++;
