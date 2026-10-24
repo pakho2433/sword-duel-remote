@@ -16,7 +16,7 @@
     $('startBtn').classList.toggle('hidden', !(S.connected && (S.phase === 'lobby' || S.phase === 'over')));
     if (S.score) $('score').textContent = `🛡️ ${S.score[0]} : ${S.score[1]} 🪓`;
   }
-  function vib(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
+  function vib(ms) { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
 
   function connect() {
     clearTimeout(retry);
@@ -94,8 +94,9 @@
   }
   $('motion').onclick = enableMotion;
   S.enableMotion = enableMotion;
-  // Non-iOS: enable automatically
+  // No permission API: enable now. Otherwise the first tap anywhere asks (iOS shows its prompt; Android grants silently).
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function') enableMotion();
+  else addEventListener('pointerup', function first() { removeEventListener('pointerup', first); if (!motionOn) enableMotion(); });
 
   // manual room entry
   const pick = (p) => { const v = $('codeIn').value.trim().toUpperCase(); if (v.length < 4) return; room = v; P = p; history.replaceState(null, '', `?room=${room}&p=${P}`); $('overlay').classList.add('hidden'); ui(); connect(); };

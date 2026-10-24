@@ -33,7 +33,7 @@ kbd{display:inline-block;background:#fff;color:#222;border-radius:8px;padding:4p
 .mid{text-align:center}#turn{font-size:26px;font-weight:bold;background:#0006;border-radius:12px;padding:2px 14px}
 #timerbar{width:160px;height:12px;background:#0005;border-radius:8px;margin-top:6px;overflow:hidden}#timerfill{height:100%;width:100%;background:#ffd54a;transition:width .1s linear}
 #arrow{position:fixed;font-size:110px;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 6px 4px #0007);animation:pop .25s}
-#banner{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);font-size:clamp(40px,8vw,96px);font-weight:900;text-shadow:0 5px 0 #0007,0 0 20px #000a;pointer-events:none;white-space:nowrap;animation:pop .3s}
+#banner{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%);font-size:clamp(40px,8vw,96px);font-weight:900;text-shadow:0 5px 0 #0007,0 0 20px #000a;pointer-events:none;white-space:nowrap;animation:pop .3s}
 @keyframes pop{0%{transform:translate(-50%,-50%) scale(.3)}70%{transform:translate(-50%,-50%) scale(1.15)}100%{transform:translate(-50%,-50%) scale(1)}}
 #winner{font-size:clamp(40px,7vw,80px)}
 .final{font-size:60px;font-weight:900;margin:6px 0}.p1c{color:#7fb2ff}.p2c{color:#ff8a8a}

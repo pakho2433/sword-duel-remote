@@ -19,7 +19,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbfe3ff, 30, 80);
 const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
-const camHome = new THREE.Vector3(0, 3.2, 8.6), camLook = new THREE.Vector3(0, 1.1, 0);
+const camHome = new THREE.Vector3(0, 2.6, 7.4), camLook = new THREE.Vector3(0, 1.25, 0);
 camera.position.copy(camHome);
 
 // sky dome gradient
@@ -118,13 +118,13 @@ async function loadFighters() {
   const mk = (g, p, keep) => {
     const root = g.scene;
     root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    for (const slot of ['handslot.r', 'handslot.l']) { const s = root.getObjectByName(slot); s.children.forEach((c) => (c.visible = keep.includes(c.name))); }
+    for (const slot of ['handslot.r', 'handslot.l']) { const s = root.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(slot)); s.children.forEach((c) => (c.visible = keep.includes(c.name))); }
     return root;
   };
   const kroot = mk(k, 1, ['1H_Sword', 'Round_Shield']);
   const broot = mk(b, 2, ['Barbarian_Round_Shield']);
-  const sw = swordSrc.clone(); sw.visible = true; broot.getObjectByName('handslot.r').add(sw);
-  for (const [p, g, root, x] of [[1, k, kroot, -1.25], [2, b, broot, 1.25]]) {
+  const sw = swordSrc.clone(); sw.visible = true; broot.getObjectByName('handslotr').add(sw);
+  for (const [p, g, root, x] of [[1, k, kroot, -1.6], [2, b, broot, 1.6]]) {
     root.position.set(x, 0.4, 0); root.rotation.y = p === 1 ? Math.PI / 2 : -Math.PI / 2;
     scene.add(root);
     const mixer = new THREE.AnimationMixer(root);
