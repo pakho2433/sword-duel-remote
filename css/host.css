@@ -1,0 +1,45 @@
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#87c6f0;font-family:"PingFang HK","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;color:#fff}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hidden{display:none!important}
+.panel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(30,25,60,.82);backdrop-filter:blur(6px);border:4px solid #ffd54a;border-radius:28px;padding:18px 26px;text-align:center;box-shadow:0 10px 40px #0006;max-width:94vw;max-height:94vh;overflow:auto}
+h1{margin:4px 0 10px;font-size:clamp(28px,5vw,52px);text-shadow:0 4px 0 #b3541e}
+.modes{display:flex;gap:10px;justify-content:center;margin-bottom:10px}
+.mode{font-size:26px;padding:8px 22px;border-radius:16px;border:3px solid #fff5;background:#0003;color:#fff;cursor:pointer}
+.mode.on{background:#ffd54a;color:#4a2b00;border-color:#fff}
+.qrs{display:flex;gap:18px;justify-content:center}
+.qrcard{background:#fff;border-radius:18px;padding:10px;color:#222;border:6px solid}
+.qrcard.p1{border-color:#3b82f6}.qrcard.p2{border-color:#ef4444}
+.qrimg{width:clamp(120px,20vw,200px);height:clamp(120px,20vw,200px)}
+.qrimg img,.qrimg svg{width:100%;height:100%;image-rendering:pixelated}
+.lab{font-size:22px;font-weight:bold;margin-top:4px}
+.dot{display:inline-block;width:18px;height:18px;border-radius:50%;background:#bbb;vertical-align:middle;transition:.3s}
+.dot.on{background:#22c55e;box-shadow:0 0 10px #22c55e}
+.code{font-size:22px;margin-top:10px}.code b{font-size:34px;letter-spacing:6px;color:#ffd54a;font-family:monospace}
+.net{font-size:18px}
+.keys{display:flex;gap:24px;justify-content:center;font-size:24px}
+.k{padding:12px 20px;border-radius:16px}.k.p1{background:#3b82f6aa}.k.p2{background:#ef4444aa}
+kbd{display:inline-block;background:#fff;color:#222;border-radius:8px;padding:4px 12px;margin:6px 3px;font-size:26px;box-shadow:0 3px 0 #999}
+.hint{margin-top:8px;font-size:18px;opacity:.85}
+.rules{font-size:22px;margin:12px 0 6px}
+.big{font-size:30px;padding:12px 44px;border-radius:20px;border:0;background:linear-gradient(#ffe27a,#ffb300);color:#4a2b00;font-weight:bold;cursor:pointer;box-shadow:0 6px 0 #b36b00;margin-top:6px}
+.big:active{transform:translateY(4px);box-shadow:0 2px 0 #b36b00}
+.small{font-size:26px;padding:8px 18px;border-radius:14px;border:0;margin-left:8px;cursor:pointer}
+#hud{position:fixed;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
+.pbox{display:flex;align-items:center;gap:10px;padding:6px 14px;border-radius:20px;border:4px solid #fff}
+.pbox.p1{background:#3b82f6dd}.pbox.p2{background:#ef4444dd}
+.ava{font-size:38px}.score{font-size:46px;font-weight:900;min-width:44px;text-align:center;text-shadow:0 3px 0 #0005}
+.role{font-size:38px}
+.mid{text-align:center}#turn{font-size:26px;font-weight:bold;background:#0006;border-radius:12px;padding:2px 14px}
+#timerbar{width:160px;height:12px;background:#0005;border-radius:8px;margin-top:6px;overflow:hidden}#timerfill{height:100%;width:100%;background:#ffd54a;transition:width .1s linear}
+#arrow{position:fixed;font-size:110px;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 6px 4px #0007);animation:pop .25s}
+#banner{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);font-size:clamp(40px,8vw,96px);font-weight:900;text-shadow:0 5px 0 #0007,0 0 20px #000a;pointer-events:none;white-space:nowrap;animation:pop .3s}
+@keyframes pop{0%{transform:translate(-50%,-50%) scale(.3)}70%{transform:translate(-50%,-50%) scale(1.15)}100%{transform:translate(-50%,-50%) scale(1)}}
+#winner{font-size:clamp(40px,7vw,80px)}
+.final{font-size:60px;font-weight:900;margin:6px 0}.p1c{color:#7fb2ff}.p2c{color:#ff8a8a}
+#touch{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:10px;pointer-events:none}
+.half{display:flex;gap:8px;pointer-events:auto}
+.half button{font-size:40px;width:84px;height:84px;border-radius:20px;border:4px solid #fff;color:#fff;touch-action:manipulation}
+.half.p1 button{background:#3b82f6cc}.half.p2 button{background:#ef4444cc}
+.half button:active{transform:scale(.9)}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:60px;background:#87c6f0}

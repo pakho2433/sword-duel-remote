@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>劍俠對決 Sword Duel</title>
+<link rel="stylesheet" href="css/host.css">
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="pbox p1"><div class="ava">🛡️</div><div class="score" id="s1">0</div><div class="role" id="r1"></div></div>
+  <div class="mid"><div id="turn">1/12</div><div id="timerbar"><div id="timerfill"></div></div></div>
+  <div class="pbox p2"><div class="role" id="r2"></div><div class="score" id="s2">0</div><div class="ava">🪓</div></div>
+</div>
+<div id="arrow" class="hidden"></div>
+<div id="banner" class="hidden"></div>
+
+<!-- Lobby -->
+<div id="lobby" class="panel">
+  <h1>⚔️ 劍俠對決</h1>
+  <div class="modes">
+    <button id="mPhone" class="mode on">📱📱</button>
+    <button id="mLocal" class="mode">⌨️ / 👆</button>
+  </div>
+  <div id="phonePane">
+    <div class="qrs">
+      <div class="qrcard p1"><div class="qrimg" id="qr1"></div><div class="lab">1P 🛡️ <span class="dot" id="d1"></span></div></div>
+      <div class="qrcard p2"><div class="qrimg" id="qr2"></div><div class="lab">2P 🪓 <span class="dot" id="d2"></span></div></div>
+    </div>
+    <div class="code">房間 <b id="roomcode">----</b> <span id="netst" class="net">⏳</span></div>
+    <div class="hint">pakho2433.github.io/sword-duel-remote/controller.html</div>
+  </div>
+  <div id="localPane" class="hidden">
+    <div class="keys"><div class="k p1">1P 🛡️<br><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><br>⬅️ ⬆️ ➡️</div><div class="k p2">2P 🪓<br><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><br>⬅️ ⬆️ ➡️</div></div>
+    <div class="hint">iPad：左右兩邊按掣 👆</div>
+  </div>
+  <div class="rules">⚔️ 劈 → 🛡️ 擋同一方向 ✅</div>
+  <button id="start" class="big">▶ 開始</button>
+</div>
+
+<!-- Result -->
+<div id="result" class="panel hidden">
+  <div id="winner"></div>
+  <div class="final"><span class="p1c" id="f1">0</span> : <span class="p2c" id="f2">0</span></div>
+  <button id="again" class="big">🔁 再玩</button>
+  <button id="toLobby" class="small">🏠</button>
+</div>
+
+<!-- touch halves for local iPad mode -->
+<div id="touch" class="hidden">
+  <div class="half p1"><button data-p="1" data-d="L">⬅️</button><button data-p="1" data-d="T">⬆️</button><button data-p="1" data-d="R">➡️</button></div>
+  <div class="half p2"><button data-p="2" data-d="L">⬅️</button><button data-p="2" data-d="T">⬆️</button><button data-p="2" data-d="R">➡️</button></div>
+</div>
+<div id="loading">⚔️ …</div>
+<script type="module" src="js/host.js"></script>
+</body>
+</html>
