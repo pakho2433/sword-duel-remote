@@ -11,8 +11,8 @@
     $('me').textContent = P === 1 ? '1P 🛡️' : '2P 🪓';
     $('conn').textContent = S.connected ? '🟢' : '🔴';
     const atk = S.role === 'atk';
-    $('role').textContent = S.phase === 'over' ? (S.win ? '🏆' : S.draw ? '🤝' : '💪') : !S.connected ? '⏳' : S.phase === 'lobby' ? '✅' : atk ? '⚔️' : '🛡️';
-    $('roleTxt').textContent = S.phase === 'over' ? (S.win ? '勝利！' : S.draw ? '平手' : '加油！') : !S.connected ? '連接中…' : S.phase === 'lobby' ? '已連接' : atk ? '你劈！' : '你擋！';
+    $('role').textContent = S.phase === 'over' ? (S.win ? '🏆' : S.draw ? '🤝' : '💪') : !S.connected ? '⏳' : S.phase === 'lobby' ? '✅' : S.phase === 'toss' ? '🪙' : atk ? '⚔️' : '🏃';
+    $('roleTxt').textContent = S.phase === 'over' ? (S.win ? '勝利！' : S.draw ? '平手' : '加油！') : !S.connected ? '連接中…' : S.phase === 'lobby' ? '已連接' : S.phase === 'toss' ? (S.side === 'Z' ? '正方 ⚔️' : '反方 🏃') : (S.side === 'Z' ? '正方 · ' : S.side === 'F' ? '反方 · ' : '') + (atk ? '你劈！' : '你閃！');
     $('calib').classList.toggle('hidden', !(S.phase === 'lobby' || S.phase === 'over')); $('score').classList.toggle('hidden', S.phase === 'lobby');
     $('startBtn').classList.toggle('hidden', !(S.connected && (S.phase === 'lobby' || S.phase === 'over')));
     if (S.score) $('score').textContent = `🛡️ ${S.score[0]} : ${S.score[1]} 🪓`;
@@ -42,8 +42,8 @@
   function setConnected(v) { S.connected = v; ui(); }
   function onData(m) {
     lastMsg = Date.now();
-    if (m.t === 'state') { const changed = m.role !== S.role || m.phase !== S.phase; Object.assign(S, { role: m.role, phase: m.phase, score: m.score }); if (m.phase !== 'block') $('incoming').textContent = ''; if (changed && m.phase === 'chop') vib(m.role === 'atk' ? 60 : 0); ui(); }
-    if (m.t === 'incoming') { $('incoming').textContent = '❗'; vib([40, 30, 40]); S.phase = 'block'; S.onIncoming && S.onIncoming(); }
+    if (m.t === 'state') { const changed = m.role !== S.role || m.phase !== S.phase; Object.assign(S, { role: m.role, phase: m.phase, score: m.score, side: m.side }); if (m.phase !== 'block') $('incoming').textContent = ''; if (changed && m.phase === 'chop') vib(m.role === 'atk' ? 60 : 0); ui(); }
+    if (m.t === 'incoming') { $('incoming').textContent = (m.dir === 'L' ? '🗡️⬅️' : '➡️🗡️') + ' 🏃❓'; vib([40, 30, 40]); S.phase = 'block'; S.onIncoming && S.onIncoming(); }
     if (m.t === 'fx') { document.body.classList.remove('good', 'bad'); void document.body.offsetWidth; document.body.classList.add(m.kind); vib(m.kind === 'bad' ? 200 : 50); }
     if (m.t === 'over') { S.phase = 'over'; S.win = m.win; S.draw = m.draw; ui(); vib(m.win ? [100, 50, 100, 50, 300] : 100); }
   }
@@ -58,9 +58,9 @@
   function act(dir, src) {
     const now = Date.now(); if (now - lastAct < 350) return; lastAct = now;
     S.sent.push({ dir, src, t: now });
-    if (src !== 'btn') { const c = $('lastSwing'); c.textContent = ({ L: '⬅️', T: '⬆️', R: '➡️' })[dir]; c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
+    if (src !== 'btn') { const c = $('lastSwing'); c.textContent = ({ L: '⬅️', R: '➡️' })[dir]; c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
     if (conn && conn.open) conn.send({ t: 'act', dir, src });
-    const fx = $('swingFx'); fx.textContent = S.role === 'atk' ? '⚔️' : '🛡️'; fx.classList.remove('show'); void fx.offsetWidth; fx.classList.add('show');
+    const fx = $('swingFx'); fx.textContent = S.role === 'atk' ? '⚔️' : '💨'; fx.classList.remove('show'); void fx.offsetWidth; fx.classList.add('show');
     const b = $('b' + dir); b.classList.add('hit'); setTimeout(() => b.classList.remove('hit'), 150);
     vib(30);
   }
@@ -96,25 +96,29 @@
     level = Math.max(power, level * 0.9); meter(level);
     // steadiness for guard
     if (acc < 2.5 && rot < 40) steadyMs += dt; else steadyMs = 0;
-    S.guard = steadyMs > 150 ? poseDir() : null; S.guardAt = now; guardUI();
     if (win) { // collecting direction evidence
       win.h += Math.abs(x) * 1.0 + Math.abs(ra) * 0.03 + Math.abs(rg) * 0.02;
       win.v += Math.abs(y) * 0.8 + Math.abs(z) * 0.6 + Math.abs(rb) * 0.03;
-      if (!win.sx && Math.abs(x) > 3) win.sx = Math.sign(x);
-      if (now - win.t0 > 120) { const d = win.h > win.v * 1.1 ? (win.sx < 0 || (!win.sx && ra > 0) ? 'L' : 'R') : 'T'; win = null; S.lastMotion = { dir: d }; S.swings++; act(d, 'motion'); }
+      if (!win.sx && Math.abs(x) > 3) win.sx = Math.sign(x); win.ra += ra;
+      if (now - win.t0 > 120) { const d = win.sx ? (win.sx < 0 ? 'L' : 'R') : (win.ra > 0 ? 'L' : 'R'); win = null; S.lastMotion = { dir: d }; S.swings++; act(d, 'motion'); }
       return;
     }
     if (power >= 1 && now > cool) {
       cool = now + 450;
-      win = { t0: now, h: 0, v: 0, sx: Math.abs(x) > 3 ? Math.sign(x) : 0 };
+      win = { t0: now, h: 0, v: 0, ra: ra, sx: Math.abs(x) > 3 ? Math.sign(x) : 0 };
       win.h += Math.abs(x) + Math.abs(ra) * 0.03 + Math.abs(rg) * 0.02; win.v += Math.abs(y) * 0.8 + Math.abs(z) * 0.6 + Math.abs(rb) * 0.03;
     }
   }
   function meter(v) { const f = $('meterFill'); if (f) { f.style.width = Math.min(100, v * 80) + '%'; f.style.background = v >= 1 ? '#22c55e' : '#ffd54a'; } }
-  function guardUI() { const g = $('guard'); if (g) g.textContent = S.guard ? '🛡️' + ({ L: '⬅️', T: '⬆️', R: '➡️' })[S.guard] : ''; }
-  // when a chop is incoming and the defender is already holding a guard pose, that counts as the block
-  const fresh = () => S.guard && performance.now() - (S.guardAt || 0) < 400;
-  S.onIncoming = () => { if (motionOn && fresh()) setTimeout(() => act(S.guard, 'guard'), 120); else { const t0 = Date.now(); const iv = setInterval(() => { if (S.phase !== 'block' || Date.now() - t0 > 1000) return clearInterval(iv); if (fresh()) { clearInterval(iv); act(S.guard, 'guard'); } }, 50); } };
+    // quick sideways tilt (roll) = dodge: gamma moves >22° away from its slow baseline within ~0.35 s
+  let gBase = null, tiltCool = 0; const gHist = [];
+  addEventListener('deviceorientation', (e) => {
+    if (e.gamma == null || !motionOn) return; const now = performance.now(), g = e.gamma;
+    gBase = gBase == null ? g : gBase * 0.97 + g * 0.03; gHist.push([now, g]); while (gHist.length && now - gHist[0][0] > 350) gHist.shift();
+    const d = g - gHist[0][1], k = SENS[sens];
+    const tl = $('tilt'); if (tl) tl.style.transform = `rotate(${Math.max(-45, Math.min(45, g - gBase))}deg)`;
+    if (Math.abs(d) > 22 * k && now > tiltCool && now > cool) { tiltCool = now + 600; cool = now + 450; gBase = g; const dir = d < 0 ? 'L' : 'R'; S.lastTilt = dir; act(dir, 'tilt'); }
+  });
   document.querySelectorAll('#sens button').forEach((b) => { b.classList.toggle('on', +b.dataset.s === sens); b.onclick = () => { sens = +b.dataset.s; localStorage.setItem('sdr-sens', sens); document.querySelectorAll('#sens button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   function enableMotion() {
     const go = () => { if (!motionOn) { addEventListener('devicemotion', onMotion); motionOn = true; } if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) DeviceOrientationEvent.requestPermission().catch(() => {}); $('motion').classList.add('on'); $('motion').textContent = '📳 ✅'; };

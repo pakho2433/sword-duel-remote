@@ -21,11 +21,12 @@
   <div class="pbox p2"><div class="role" id="r2"></div><div class="score" id="s2">0</div><div class="ava">🪓</div></div>
 </div>
 <div id="divider" class="hidden"></div>
-<div id="vh1" class="vh p1 hidden"><div class="vtag">1P 🛡️ <b id="vs1">0</b></div><div class="vrole"><span id="vr1"></span><span id="vt1"></span></div></div>
-<div id="vh2" class="vh p2 hidden"><div class="vtag">2P 🪓 <b id="vs2">0</b></div><div class="vrole"><span id="vr2"></span><span id="vt2"></span></div></div>
+<div id="vh1" class="vh p1 hidden"><div class="vtag">1P 🛡️ <i id="vz1"></i> <b id="vs1">0</b></div><div id="cue1" class="cue hidden"></div><div class="vrole"><span id="vr1"></span><span id="vt1"></span></div></div>
+<div id="vh2" class="vh p2 hidden"><div class="vtag">2P 🪓 <i id="vz2"></i> <b id="vs2">0</b></div><div id="cue2" class="cue hidden"></div><div class="vrole"><span id="vr2"></span><span id="vt2"></span></div></div>
 <button id="viewBtn" title="視角"></button>
 <div id="arrow" class="hidden"></div>
 <div id="banner" class="hidden"></div>
+<div id="coinTxt" class="hidden"></div>
 
 <!-- Lobby -->
 <div id="lobby" class="panel">
@@ -51,10 +52,10 @@
     <div class="rtxt">🌐 <span class="dot" id="dg"></span></div>
   </div>
   <div id="localPane" class="hidden">
-    <div class="keys"><div class="k p1">1P 🛡️<br><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><br>⬅️ ⬆️ ➡️</div><div class="k p2">2P 🪓<br><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><br>⬅️ ⬆️ ➡️</div></div>
+    <div class="keys"><div class="k p1">1P 🛡️<br><kbd>A</kbd><kbd>D</kbd><br>⬅️ ➡️</div><div class="k p2">2P 🪓<br><kbd>J</kbd><kbd>L</kbd><br>⬅️ ➡️</div></div>
     <div class="hint">iPad：左右兩邊按掣 👆</div>
   </div>
-  <div class="rules">⚔️ 揮手機劈 → 🛡️ 擋同一方向 ✅<br><small>🛡️ 手機 ⬅️傾 / ⬆️企直 / ➡️傾 定住 = 擋</small></div>
+  <div class="rules">🪙 擲金幣：正方 ⚔️ 先劈 · 反方 🏃 先閃<br>⚔️⬅️ → 🏃➡️ ✅ &nbsp; ⚔️➡️ → 🏃⬅️ ✅</div>
   <button id="start" class="big">▶ 開始</button>
 </div>
 
@@ -68,8 +69,8 @@
 
 <!-- touch halves for local iPad mode -->
 <div id="touch" class="hidden">
-  <div class="half p1"><button data-p="1" data-d="L">⬅️</button><button data-p="1" data-d="T">⬆️</button><button data-p="1" data-d="R">➡️</button></div>
-  <div class="half p2"><button data-p="2" data-d="L">⬅️</button><button data-p="2" data-d="T">⬆️</button><button data-p="2" data-d="R">➡️</button></div>
+  <div class="half p1"><button data-p="1" data-d="L">⬅️</button><button data-p="1" data-d="R">➡️</button></div>
+  <div class="half p2"><button data-p="2" data-d="L">⬅️</button><button data-p="2" data-d="R">➡️</button></div>
 </div>
 <div id="loading">⚔️ …</div>
 <script type="module" src="js/host.js"></script>

@@ -12,7 +12,8 @@ const IS_GUEST = !!JOIN; // guest screen in online remote mode: mirrors the host
 let BLOCK_WIN = BLOCK_BASE;
 let guestConn = null, guestRtt = 0; // host side
 function emit(ev, data = {}) { if (guestConn && guestConn.open) try { guestConn.send({ t: 'g', ev, ...data }); } catch (e) {} }
-const DIRS = { L: '⬅️', T: '⬆️', R: '➡️' };
+const DIRS = { L: '⬅️', R: '➡️' };
+const OPP = { L: 'R', R: 'L' };
 
 // ---------------- Three.js scene ----------------
 const canvas = $('c');
@@ -161,24 +162,26 @@ const other = (p) => (p === 1 ? 2 : 1);
 
 function setBanner(txt, ms = 1000, color = '#fff') { const b = $('banner'); b.textContent = txt; b.style.color = color; b.classList.remove('hidden'); b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; clearTimeout(setBanner.t); if (ms) setBanner.t = setTimeout(() => b.classList.add('hidden'), ms); }
 function hud() {
-  for (const p of [1, 2]) { const atk = state.attacker === p; $('vr' + p).textContent = atk ? '⚔️' : '🛡️'; $('vt' + p).textContent = atk ? '劈！' : '擋！'; $('vs' + p).textContent = state.score[p]; $('vh' + p).classList.toggle('atk', atk); }
+  for (const p of [1, 2]) { const atk = state.attacker === p; $('vr' + p).textContent = atk ? '⚔️' : '🏃'; $('vt' + p).textContent = state.phase === 'toss' ? '🪙' : atk ? '劈！' : '閃！'; $('vz' + p).textContent = state.first ? (state.first === p ? '正方' : '反方') : ''; $('vs' + p).textContent = state.score[p]; $('vh' + p).classList.toggle('atk', atk); }
   layoutHalves();
   $('s1').textContent = state.score[1]; $('s2').textContent = state.score[2];
   $('turn').textContent = `${Math.min(state.turn + 1, TURNS)}/${TURNS}`;
-  $('r1').textContent = state.attacker === 1 ? '⚔️' : '🛡️'; $('r2').textContent = state.attacker === 2 ? '⚔️' : '🛡️';
+  $('r1').textContent = state.attacker === 1 ? '⚔️' : '🏃'; $('r2').textContent = state.attacker === 2 ? '⚔️' : '🏃';
 }
-function broadcast() { for (const p of [1, 2]) send(p, { t: 'state', role: state.attacker === p ? 'atk' : 'def', phase: state.phase, score: [state.score[1], state.score[2]], turn: state.turn, turns: TURNS }); }
+function broadcast() { for (const p of [1, 2]) send(p, { t: 'state', role: state.attacker === p ? 'atk' : 'def', side: state.first ? (state.first === p ? 'Z' : 'F') : '', phase: state.phase, score: [state.score[1], state.score[2]], turn: state.turn, turns: TURNS }); }
 
-function startMatch() {
-  unlockAudio(); emit('start');
+function startMatch(first) {
+  unlockAudio();
   BLOCK_WIN = state.mode === 'remote' ? BLOCK_BASE + 0.15 + Math.min(0.25, guestRtt / 2000) : BLOCK_BASE;
-  state.turn = 0; state.score = { 1: 0, 2: 0 }; state.attacker = 1; state.log = [];
+  state.turn = 0; state.score = { 1: 0, 2: 0 }; state.log = [];
+  state.first = first || (Math.random() < 0.5 ? 1 : 2); state.attacker = state.first; // 正方 (heads) attacks first
+  emit('start', { first: state.first });
   $('lobby').classList.add('hidden'); $('result').classList.add('hidden'); $('hud').classList.remove('hidden');
   touchFor();
   for (const p of [1, 2]) { fighters[p].hold = false; fighters[p].play('2H_Melee_Idle'); }
   sfx.gong();
-  setBanner('準備！', 1200, '#ffd54a');
-  nextTurn(1.4);
+  coinToss(state.first);
+  state.phase = 'toss'; state.t = 3.6; hud(); broadcast();
 }
 function nextTurn(delay = 0) {
   state.phase = 'wait'; state.t = delay; hud(); broadcast(); touchFor();
@@ -187,10 +190,10 @@ function beginChopWindow() {
   emit('chopwin');
   state.phase = 'chop'; state.t = CHOP_TIME; state.chopDir = null; state.early = { 1: 0, 2: 0 };
   hud(); broadcast();
-  setBanner(state.attacker === 1 ? '🛡️ ⚔️ 劈！' : '🪓 ⚔️ 劈！', 900, state.attacker === 1 ? '#7fb2ff' : '#ff8a8a');
+  setBanner((state.attacker === 1 ? '🛡️' : '🪓') + ' ⚔️ 劈！', 900, state.attacker === 1 ? '#7fb2ff' : '#ff8a8a');
   sfx.tick();
 }
-const ATK_CLIP = { L: '1H_Melee_Attack_Slice_Diagonal', R: '1H_Melee_Attack_Slice_Horizontal', T: '1H_Melee_Attack_Chop' };
+const ATK_CLIP = { L: '1H_Melee_Attack_Slice_Diagonal', R: '1H_Melee_Attack_Slice_Horizontal' };
 function doChop(dir) {
   emit('chop', { dir, win: BLOCK_WIN });
   const a = fighters[state.attacker];
@@ -198,7 +201,8 @@ function doChop(dir) {
   a.play(ATK_CLIP[dir], { once: true, speed: 0.75 }); a.lunge = 1;
   sfx.whoosh();
   // telegraph arrow above attacker
-  const ar = $('arrow'); ar.textContent = DIRS[dir]; ar.classList.remove('hidden'); ar.style.animation = 'none'; void ar.offsetWidth; ar.style.animation = '';
+  showCues(dir);
+  const ar = $('arrow'); ar.textContent = '🗡️' + DIRS[dir]; ar.classList.remove('hidden'); ar.style.animation = 'none'; void ar.offsetWidth; ar.style.animation = '';
   state.arrowP = state.attacker;
   broadcast(); send(other(state.attacker), { t: 'incoming', dir });
 }
@@ -206,26 +210,27 @@ function input(p, dir, src = 'key') {
   if (IS_GUEST) { if (hostConn && hostConn.open) hostConn.send({ t: 'act', dir, src: 'guest-' + src }); return; }
   state.log.push({ p, dir, src, phase: state.phase });
   if (state.phase === 'chop' && p === state.attacker) return doChop(dir);
-  if (state.phase === 'chop' && p !== state.attacker) { state.early[p] = 0.35; return; } // early block ignored
+  if (!'LR'.includes(dir)) return;
+  if (state.phase === 'chop' && p !== state.attacker) return; // dodging before the chop doesn't count
   if (state.phase === 'block' && p !== state.attacker && !state.blockDir) { resolve(dir); }
 }
 function resolve(blockDir) {
-  emit('res', { blockDir: blockDir || null });
+  emit('res', { blockDir: blockDir || null }); hideCues();
   const A = state.attacker, D = other(A); const a = fighters[A], d = fighters[D];
   state.blockDir = blockDir || null;
-  const ok = blockDir === state.chopDir;
+  const ok = !!blockDir && blockDir === OPP[state.chopDir]; // dodge to the opposite side of the chop
   $('arrow').classList.add('hidden');
   state.phase = 'result'; state.t = 1.6;
   const hit = new THREE.Vector3(0, 1.4, 0.2);
   if (ok) {
-    state.score[D]++; d.play('Block', { once: true }); sfx.clang(); burst(hit, [0xffffff, 0xffe14a, 0xffa500], 36, 5, 0.06);
-    setBanner('🛡️ 擋到！+1', 1300, D === 1 ? '#7fb2ff' : '#ff8a8a'); state.shake = 0.25;
+    state.score[D]++; dodge(d, blockDir, true); sfx.dodge(); burst(hit, [0xffffff, 0xbfe3ff], 20, 3, 0.05);
+    setBanner('💨 閃開！+1', 1300, D === 1 ? '#7fb2ff' : '#ff8a8a'); state.shake = 0.1;
     send(D, { t: 'fx', kind: 'good' }); send(A, { t: 'fx', kind: 'bad' });
   } else {
-    state.score[A]++; d.play('Hit_A', { once: true }); sfx.bonk();
+    state.score[A]++; if (blockDir) dodge(d, blockDir, false); d.play('Hit_A', { once: true }); sfx.bonk();
     burst(new THREE.Vector3(d.baseX, 2.1, 0), [0xffe14a, 0xffffff], 14, 3, 0.07, true);
     dizzy.visible = true; dizzy.userData.p = D; dizzy.userData.t = 1.4;
-    setBanner(blockDir ? '❌ 方向錯！' : '💥 中招！', 1300, A === 1 ? '#7fb2ff' : '#ff8a8a'); state.shake = 0.15;
+    setBanner(blockDir ? '❌ 閃錯邊！' : '💥 中招！', 1300, A === 1 ? '#7fb2ff' : '#ff8a8a'); state.shake = 0.15;
     send(A, { t: 'fx', kind: 'good' }); send(D, { t: 'fx', kind: 'bad' });
   }
   hud(); broadcast();
@@ -252,7 +257,7 @@ function endMatch() {
 }
 
 // ---------------- input: keyboard + touch ----------------
-const KEYS = { a: [1, 'L'], s: [1, 'T'], d: [1, 'R'], j: [2, 'L'], k: [2, 'T'], l: [2, 'R'], w: [1, 'T'], i: [2, 'T'] };
+const KEYS = { a: [1, 'L'], d: [1, 'R'], j: [2, 'L'], l: [2, 'R'], arrowleft: [2, 'L'], arrowright: [2, 'R'] };
 addEventListener('keydown', (e) => { const k = KEYS[e.key.toLowerCase()]; if (k && !e.repeat) input(state.mode === 'remote' && !IS_GUEST ? 1 : k[0], k[1], 'key'); if (e.key === 'Enter' && state.phase === 'lobby') $('start').onclick(); });
 document.querySelectorAll('#touch button').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); unlockAudio(); input(+b.dataset.p, b.dataset.d, 'touch'); }));
 
@@ -278,13 +283,13 @@ function startPeer() {
       if (m.t === 'hello' && m.screen) { if (guestConn && guestConn !== c) try { guestConn.close(); } catch (e) {} guestConn = c; c._guest = true; document.querySelectorAll('#dg,#dgH').forEach((x)=>x.classList.add('on')); sfx.ding(); c.send({ t: 'snap', ...snap(), sync: true }); return; }
       if (c._guest) {
         if (m.t === 'gpr') { guestRtt = performance.now() - m.ts; $('ping').textContent = '📶 ' + Math.round(guestRtt) + 'ms'; }
-        if (m.t === 'act' && 'LTR'.includes(m.dir)) input(2, m.dir, m.src);
+        if (m.t === 'act' && 'LR'.includes(m.dir)) input(2, m.dir, m.src);
         if (m.t === 'start' && (state.phase === 'lobby' || state.phase === 'over')) startMatch();
         return;
       }
       if (m.t === 'hello') { const p = m.p === 2 ? 2 : 1; if (conns[p] && conns[p] !== c) try { conns[p].close(); } catch (e) {} conns[p] = c; c._p = p; lastSeen[p] = performance.now(); setDot(p, true); sfx.ding(); broadcast(); return; }
       const p = c._p; if (!p) return; lastSeen[p] = performance.now();
-      if (m.t === 'act' && 'LTR'.includes(m.dir)) input(p, m.dir, m.src || 'phone');
+      if (m.t === 'act' && 'LR'.includes(m.dir)) input(p, m.dir, m.src || 'phone');
       if (m.t === 'start' && (state.phase === 'lobby' || state.phase === 'over')) startMatch();
     });
     c.on('close', () => { if (c === guestConn) { guestConn = null; document.querySelectorAll('#dg,#dgH').forEach((x)=>x.classList.remove('on')); $('ping').textContent = '📶 ❌'; } if (c._p && conns[c._p] === c) { conns[c._p] = null; setDot(c._p, false); } });
@@ -340,9 +345,9 @@ function updFpCams(dt) {
     const me = fighters[p], op = fighters[other(p)]; if (!me || !me.head) continue;
     const hp = new THREE.Vector3(); me.head.getWorldPosition(hp);
     const fwd = p === 1 ? 1 : -1;
-    const want = new THREE.Vector3(me.root.position.x - fwd * 0.55, hp.y + 0.55, 0.12 * fwd); // just behind the eyes, slightly above: own arms + sword in view
+    const want = new THREE.Vector3(me.root.position.x - fwd * 0.55, hp.y + 0.55, me.root.position.z + 0.12 * fwd); // just behind the eyes, slightly above: own arms + sword in view
     const oh = new THREE.Vector3(); op.head.getWorldPosition(oh);
-    const look = new THREE.Vector3(oh.x, oh.y - 0.15, 0);
+    const look = new THREE.Vector3(oh.x, oh.y - 0.15, coin.visible ? 0 : op.root.position.z * 0.5 + me.root.position.z * 0.5);
     const k = fpPos[p].lengthSq() ? 1 - Math.exp(-dt * 10) : 1;
     fpPos[p].lerp(want, k); fpLook[p].lerp(look, k);
     const sh = state.shake || 0; const c = fpCam[p];
@@ -364,11 +369,14 @@ const timer = new Timer(); let tAcc = 0;
 const tmp = new THREE.Vector3();
 renderer.setAnimationLoop((ts) => {
   timer.update(ts); const dt = Math.min(timer.getDelta(), 0.05); tAcc += dt;
-  for (const p of [1, 2]) { const f = fighters[p]; if (!f) continue; f.mixer.update(dt); f.lunge = Math.max(0, f.lunge - dt * 1.4); const dirx = p === 1 ? 1 : -1; f.root.position.x = f.baseX + dirx * Math.sin(Math.min(1, f.lunge) * Math.PI) * 0.35; }
+  for (const p of [1, 2]) { const f = fighters[p]; if (!f) continue; f.mixer.update(dt); f.lunge = Math.max(0, f.lunge - dt * 1.4); const dirx = p === 1 ? 1 : -1; f.root.position.x = f.baseX + dirx * Math.sin(Math.min(1, f.lunge) * Math.PI) * 0.35;
+    if (f.dz) { f.dz.t += dt; const u = Math.min(1, f.dz.t / 1.2); f.root.position.z = f.dz.amt * Math.sin(Math.min(1, u * 1.6) * Math.PI / 2) * (u > 0.7 ? 1 - (u - 0.7) / 0.3 : 1); if (u >= 1) { f.dz = null; f.root.position.z = 0; } } }
+  updCoin(dt);
   // phases
   if (IS_GUEST) { if (state.t > 0) state.t -= dt; if (state.phase === 'chop') $('timerfill').style.width = (100 * state.t / CHOP_TIME) + '%'; if (state.phase === 'block') $('timerfill').style.width = (100 * state.t / BLOCK_WIN) + '%'; }
+  else if (state.phase === 'toss') { state.t -= dt; if (state.t <= 0) nextTurn(0.3); }
   else if (state.phase === 'wait') { state.t -= dt; if (state.t <= 0) beginChopWindow(); }
-  else if (state.phase === 'chop') { state.t -= dt; $('timerfill').style.width = (100 * state.t / CHOP_TIME) + '%'; if (state.t <= 0) doChop('LTR'[Math.floor(Math.random() * 3)]); }
+  else if (state.phase === 'chop') { state.t -= dt; $('timerfill').style.width = (100 * state.t / CHOP_TIME) + '%'; if (state.t <= 0) doChop(Math.random() < 0.5 ? 'L' : 'R'); }
   else if (state.phase === 'block') { state.t -= dt; $('timerfill').style.width = (100 * state.t / BLOCK_WIN) + '%'; if (state.t <= 0) resolve(null); }
   else if (state.phase === 'result') { state.t -= dt; if (state.t <= 0) afterResult(); }
   // arrow follows attacker head
@@ -436,7 +444,7 @@ function onHostMsg(m) {
   }
   if (m.t !== 'g') return;
   switch (m.ev) {
-    case 'start': startMatch(); break;
+    case 'start': startMatch(m.first); break;
     case 'chopwin': beginChopWindow(); break;
     case 'chop': BLOCK_WIN = m.win || BLOCK_WIN; doChop(m.dir); break;
     case 'res': if (state.phase !== 'block') { state.chopDir = state.chopDir || 'T'; } resolve(m.blockDir); break;
@@ -447,3 +455,42 @@ function onHostMsg(m) {
 }
 
 if (IS_GUEST) startGuest(); else startPeer();
+
+// ---------------- dodge + coin toss + cues ----------------
+// own-perspective side -> world z: 1P faces +x (right = +z), 2P faces -x (right = -z)
+function sideZ(p, dir) { return (dir === 'R' ? 1 : -1) * (p === 1 ? 1 : -1); }
+function dodge(f, dir, ok) { f.dz = { t: 0, amt: sideZ(f.p, dir) * (ok ? 1.0 : 0.45) }; if (ok) f.play(dir === 'R' ? 'Dodge_Right' : 'Dodge_Left', { once: true, speed: 1.2 }); }
+function faceTex(txt, bg, fg) { const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); x.fillStyle = bg; x.beginPath(); x.arc(128, 128, 126, 0, 7); x.fill(); x.strokeStyle = '#b8860b'; x.lineWidth = 14; x.beginPath(); x.arc(128, 128, 112, 0, 7); x.stroke(); x.fillStyle = fg; x.font = 'bold 150px "Noto Sans TC","PingFang HK",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 128, 138); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.07, 48), [
+  new THREE.MeshStandardMaterial({ color: 0xd4a017, metalness: 0.9, roughness: 0.3 }),
+  new THREE.MeshStandardMaterial({ map: faceTex('正', '#ffd54a', '#a0522d'), metalness: 0.6, roughness: 0.35 }),
+  new THREE.MeshStandardMaterial({ map: (() => { const t = faceTex('反', '#e6c25a', '#5b3a1a'); t.wrapS = THREE.RepeatWrapping; t.repeat.x = -1; return t; })(), metalness: 0.6, roughness: 0.35 })]);
+coin.visible = false; coin.castShadow = true; scene.add(coin);
+const coinGlow = new THREE.PointLight(0xffe08a, 0, 5); scene.add(coinGlow);
+let coinSt = null;
+function coinToss(first) {
+  // heads (正) always faces 1P's side if 1P is 正方, else faces 2P — the face toward the winner reads 正
+  coinSt = { t: 0, first, flips: 7, ding: 0 }; coin.visible = true; sfx.coin();
+  $('coinTxt').classList.add('hidden');
+}
+function updCoin(dt) {
+  if (!coinSt) return; const c = coinSt; c.t += dt; const T = 2.2;
+  const u = Math.min(1, c.t / T);
+  const y = 1.3 + Math.sin(u * Math.PI) * 1.6; coin.position.set(0, y, 0);
+  // end orientation: cylinder axis along x; top cap (正) faces the 正方 player
+  const endRot = c.first === 1 ? Math.PI / 2 : -Math.PI / 2; // rotation about z
+  const ease = 1 - Math.pow(1 - u, 3);
+  coin.rotation.set(0, 0, endRot + (1 - ease) * c.flips * Math.PI * 2);
+  coinGlow.position.copy(coin.position); coinGlow.intensity = 3;
+  const k = Math.floor(ease * c.flips * 2); if (k > c.ding && u < 1) { c.ding = k; sfx.tick(); }
+  if (u >= 1 && !c.done) { c.done = true; sfx.clink(); burst(coin.position.clone(), [0xffe14a, 0xffffff], 30, 3, 0.05);
+    const ct = $('coinTxt'); ct.innerHTML = `🪙 <span class="${c.first === 1 ? 'p1c' : 'p2c'}">${c.first}P 正方 ⚔️</span> · <span class="${c.first === 1 ? 'p2c' : 'p1c'}">${3 - c.first}P 反方 🏃</span>`; ct.classList.remove('hidden'); hud(); }
+  if (c.t > T + 1.3) { coin.visible = false; coinGlow.intensity = 0; coinSt = null; $('coinTxt').classList.add('hidden'); }
+}
+function showCues(dir) {
+  const A = state.attacker, D = other(A);
+  // attacker half: own chop arrow. defender half: blade comes in on that side (both players face the same way in the room)
+  $('cue' + A).className = 'cue atk ' + dir; $('cue' + A).innerHTML = `<div class="cbig">⚔️${DIRS[dir]}</div>`;
+  $('cue' + D).className = 'cue def ' + dir; $('cue' + D).innerHTML = `<div class="danger">🗡️</div><div class="cbig">🏃❓</div>`;
+}
+function hideCues() { for (const p of [1, 2]) { $('cue' + p).className = 'cue hidden'; } }

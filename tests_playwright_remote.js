@@ -9,7 +9,8 @@ const SIM = () => {
       if (dir === 'T') fire(1.5 * env, -16 * env, 6 * env, 20, 320 * env, 10); else fire(s * 17 * env, 2 * env, 3 * env, -s * 250 * env, 20, 30);
       await new Promise((r) => setTimeout(r, 16)); }
   };
-  window.__hold = async (dir) => { window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: dir === 'T' ? 75 : 40, gamma: dir === 'L' ? -45 : dir === 'R' ? 45 : 0 }));
+  window.__tilt = async (dir) => { for (let i = 0; i <= 10; i++) { window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: 60, gamma: (dir === 'L' ? -1 : 1) * 4 * i })); await new Promise((r) => setTimeout(r, 20)); } };
+  window.__hold = async (dir) => { window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: 40, gamma: 0 }));
     for (let i = 0; i < 20; i++) { fire(0.2, 0.1, 0.1, 2, 3, 1); await new Promise((r) => setTimeout(r, 16)); }
     (async () => { for (let i = 0; i < 150; i++) { fire(0.2, 0.1, 0.1, 2, 3, 1); await new Promise((r) => setTimeout(r, 16)); } })(); };
 };
@@ -34,7 +35,7 @@ const SIM = () => {
   await host.waitForFunction(() => window.__game.conn[1] && window.__game.conn[2], null, { timeout: 45000 });
   for (const p of [1, 2]) await ctl[p].tap('#motion');
   await guest.waitForTimeout(1500);
-  await host.screenshot({ path: OUT + 'r1_host_lobby.png' }); await guest.screenshot({ path: OUT + 'r2_guest_lobby.png' });
+  await host.screenshot({ path: OUT + 'd_r1_host_lobby.png' }); await guest.screenshot({ path: OUT + 'd_r2_guest_lobby.png' });
   console.log('ping on guest', await guest.textContent('#ping'));
   await guest.tap('#start'); // guest asks host to start
   await host.waitForFunction(() => window.__game.phase !== 'lobby', null, { timeout: 10000 });
@@ -44,22 +45,23 @@ const SIM = () => {
     if (g.phase === 'over') break;
     if (g.phase === 'chop' && !seen.has(g.turn)) {
       seen.add(g.turn); i++;
-      const dir = 'LTR'[i % 3], def = g.atk === 1 ? 2 : 1, a = ctl[g.atk], d = ctl[def];
-      const hold = i % 4 === 3;
+      const dir = 'LR'[i % 2], def = g.atk === 1 ? 2 : 1, a = ctl[g.atk], d = ctl[def];
+      const hold = false, tilt = i % 4 === 3;
       if (hold) await d.evaluate((x) => window.__hold(x), dir);
       await a.waitForTimeout(250);
-      if (g.atk === 2 && i % 4 === 0) await guest.keyboard.press({ L: 'j', T: 'k', R: 'l' }[dir]); // guest screen keyboard fallback
+      if (g.atk === 2 && i % 4 === 0) await guest.keyboard.press({ L: 'j', R: 'l' }[dir]); // guest screen keyboard fallback
       else await a.evaluate((x) => window.__swing(x), dir);
       await host.waitForFunction(() => window.__game.phase !== 'chop', null, { timeout: 6000 });
-      if (shots === 0) { await guest.waitForTimeout(150); await host.screenshot({ path: OUT + 'r3_host_chop.png' }); await guest.screenshot({ path: OUT + 'r4_guest_chop.png' }); }
-      const bdir = i % 5 === 1 ? 'LTR'[(i + 1) % 3] : dir;
+      if (shots === 0) { await guest.waitForTimeout(150); await host.screenshot({ path: OUT + 'd_r3_host_chop.png' }); await guest.screenshot({ path: OUT + 'd_r4_guest_chop.png' }); }
+      const bdir = i % 5 === 1 ? dir : { L: 'R', R: 'L' }[dir];
       if (!hold) {
         await d.waitForTimeout(150);
         if (def === 2 && i % 3 === 2) await guest.tap(`#touch .half.p2 button[data-d="${bdir}"]`); // guest touch fallback
+        else if (tilt) await d.evaluate((x) => window.__tilt(x), bdir);
         else await d.evaluate((x) => window.__swing(x), bdir);
       }
       await host.waitForFunction(() => window.__game.phase !== 'block', null, { timeout: 6000 });
-      if (shots === 1) { await guest.waitForTimeout(400); await host.screenshot({ path: OUT + 'r5_host_result.png' }); await guest.screenshot({ path: OUT + 'r6_guest_result.png' }); }
+      if (shots === 1) { await guest.waitForTimeout(400); await host.screenshot({ path: OUT + 'd_r5_host_result.png' }); await guest.screenshot({ path: OUT + 'd_r6_guest_result.png' }); }
       shots++;
     }
     await host.waitForTimeout(80);
@@ -69,8 +71,8 @@ const SIM = () => {
   const gs = await guest.evaluate(() => ({ score: window.__game.score, phase: window.__game.phase, ui: document.getElementById('f1').textContent + ':' + document.getElementById('f2').textContent }));
   console.log('HOST', JSON.stringify(hs), 'GUEST', JSON.stringify(gs), 'turns', seen.size);
   console.log('SAME', hs.score[1] === gs.score[1] && hs.score[2] === gs.score[2] && gs.phase === 'over');
-  await host.screenshot({ path: OUT + 'r7_host_end.png' }); await guest.screenshot({ path: OUT + 'r8_guest_end.png' });
-  await ctl[2].screenshot({ path: OUT + 'r9_phone2_end.png' });
+  await host.screenshot({ path: OUT + 'd_r7_host_end.png' }); await guest.screenshot({ path: OUT + 'd_r8_guest_end.png' });
+  await ctl[2].screenshot({ path: OUT + 'd_r9_phone2_end.png' });
   // guest screen reconnect: reload guest, expect re-sync
   await guest.reload();
   await guest.waitForFunction(() => window.__game && window.__game.hostOk, null, { timeout: 45000 });
@@ -82,7 +84,7 @@ const SIM = () => {
   await host.waitForFunction(() => window.__game.phase !== 'over' && window.__game.turn === 0, null, { timeout: 10000 });
   await guest.waitForFunction(() => !['over', 'lobby'].includes(window.__game.phase), null, { timeout: 10000 });
   console.log('rematch ok on both');
-  await guest.waitForTimeout(1500); await guest.screenshot({ path: OUT + 'r10_guest_rematch.png' });
+  await guest.waitForTimeout(1500); await guest.screenshot({ path: OUT + 'd_r10_guest_rematch.png' });
   console.log('ERRORS', errors.length, JSON.stringify(errors, null, 1));
   await browser.close();
 })().catch((e) => { console.error('FAIL', e); console.log('ERRORS', JSON.stringify(errors)); process.exit(1); });
