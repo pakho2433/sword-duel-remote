@@ -51,3 +51,18 @@ kbd{display:inline-block;background:#fff;color:#222;border-radius:8px;padding:4p
 .remote .rules small,.remote #phonePane .hint{display:none}
 .remote .qrimg{width:clamp(110px,17vw,170px);height:clamp(110px,17vw,170px)}
 .remote .rules{margin:6px 0 2px;font-size:18px}.remote .rbox{margin-top:4px}
+.vh{position:fixed;pointer-events:none;box-sizing:border-box;border:5px solid transparent}
+.vh.p1{border-color:#3b82f6aa}.vh.p2{border-color:#ef4444aa}.vh.atk{animation:none}
+.vtag{position:absolute;left:12px;bottom:12px;font-size:26px;font-weight:900;padding:4px 14px;border-radius:16px;border:3px solid #fff}
+.vh.p1 .vtag{background:#3b82f6dd}.vh.p2 .vtag{background:#ef4444dd}.vh.p2 .vtag{left:auto;right:12px}
+.vtag b{font-size:34px;margin-left:6px}
+.vrole{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font-size:30px;font-weight:900;background:#0007;border-radius:18px;padding:4px 16px;white-space:nowrap;text-shadow:0 2px 0 #000}
+.vrole span:first-child{font-size:40px;margin-right:6px}
+.vh.atk .vrole{background:#f59e0bcc}
+#divider{position:fixed;left:50%;top:0;bottom:0;width:6px;transform:translateX(-50%);background:#fff;box-shadow:0 0 12px #000a;pointer-events:none}
+.portrait #divider{left:0;right:0;top:50%;bottom:auto;width:auto;height:6px;transform:translateY(-50%)}
+.split #hud .pbox{display:none}
+.split #touch{bottom:70px}
+.portrait.split #touch .half.p1{position:fixed;left:10px;top:calc(50% - 170px)}
+#viewBtn{position:fixed;right:12px;bottom:12px;font-size:28px;width:56px;height:56px;border-radius:16px;border:3px solid #fff;background:#0006;color:#fff;z-index:5;cursor:pointer}
+.split #viewBtn{bottom:auto;top:12px}

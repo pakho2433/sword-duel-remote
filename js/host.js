@@ -26,6 +26,12 @@ scene.fog = new THREE.Fog(0xbfe3ff, 30, 80);
 const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
 const camHome = new THREE.Vector3(0, 2.6, 7.4), camLook = new THREE.Vector3(0, 1.25, 0);
 camera.position.copy(camHome);
+camera.layers.enable(2); camera.layers.enable(3);
+const fpCam = { 1: new THREE.PerspectiveCamera(72, 1, 0.05, 200), 2: new THREE.PerspectiveCamera(72, 1, 0.05, 200) };
+fpCam[1].layers.enable(3); fpCam[2].layers.enable(2); // each eye sees the opponent's head, not its own
+const fpPos = { 1: new THREE.Vector3(), 2: new THREE.Vector3() }, fpLook = { 1: new THREE.Vector3(), 2: new THREE.Vector3() };
+// view: 'split' (two first-person halves, default) or 'shared' (classic side camera)
+let VIEW = localStorage.getItem('sdr-view') || 'split';
 
 // sky dome gradient
 {
@@ -130,11 +136,12 @@ async function loadFighters() {
   const broot = mk(b, 2, ['Barbarian_Round_Shield']);
   const sw = swordSrc.clone(); sw.visible = true; broot.getObjectByName('handslotr').add(sw);
   for (const [p, g, root, x] of [[1, k, kroot, -1.6], [2, b, broot, 1.6]]) {
+    root.traverse((o) => { if (o.isMesh && /(_Head|_Helmet|_Hat)$/.test(o.name)) { o.layers.set(p + 1); } }); // hidden from own first-person camera
     root.position.set(x, 0.4, 0); root.rotation.y = p === 1 ? Math.PI / 2 : -Math.PI / 2;
     scene.add(root);
     const mixer = new THREE.AnimationMixer(root);
     const clips = {}; g.animations.forEach((c) => (clips[c.name] = c));
-    const f = { p, root, mixer, clips, cur: null, baseX: x, lunge: 0 };
+    const f = { p, root, mixer, clips, cur: null, baseX: x, lunge: 0, head: root.getObjectByName('head') };
     f.play = (name, { once = false, fade = 0.15, speed = 1 } = {}) => {
       const a = mixer.clipAction(clips[name]);
       a.reset(); a.timeScale = speed; a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once;
@@ -154,6 +161,8 @@ const other = (p) => (p === 1 ? 2 : 1);
 
 function setBanner(txt, ms = 1000, color = '#fff') { const b = $('banner'); b.textContent = txt; b.style.color = color; b.classList.remove('hidden'); b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; clearTimeout(setBanner.t); if (ms) setBanner.t = setTimeout(() => b.classList.add('hidden'), ms); }
 function hud() {
+  for (const p of [1, 2]) { const atk = state.attacker === p; $('vr' + p).textContent = atk ? '⚔️' : '🛡️'; $('vt' + p).textContent = atk ? '劈！' : '擋！'; $('vs' + p).textContent = state.score[p]; $('vh' + p).classList.toggle('atk', atk); }
+  layoutHalves();
   $('s1').textContent = state.score[1]; $('s2').textContent = state.score[2];
   $('turn').textContent = `${Math.min(state.turn + 1, TURNS)}/${TURNS}`;
   $('r1').textContent = state.attacker === 1 ? '⚔️' : '🛡️'; $('r2').textContent = state.attacker === 2 ? '⚔️' : '🛡️';
@@ -308,12 +317,49 @@ $('mLocal').onclick = () => setMode('local');
 const startBtn = () => { if (IS_GUEST) { unlockAudio(); hostConn && hostConn.open && hostConn.send({ t: 'start' }); } else startMatch(); };
 $('start').onclick = startBtn; $('again').onclick = startBtn;
 $('toLobby').onclick = () => { if (IS_GUEST) return; emit('lobby'); toLobbyView(); };
-function toLobbyView() { state.phase = 'lobby'; touchFor(); $('result').classList.add('hidden'); $('hud').classList.add('hidden'); $('lobby').classList.remove('hidden'); for (const p of [1, 2]) { fighters[p].hold = false; fighters[p].play('2H_Melee_Idle'); } broadcast(); }
+function toLobbyView() { state.phase = 'lobby'; touchFor(); layoutHalves(); $('result').classList.add('hidden'); $('hud').classList.add('hidden'); $('lobby').classList.remove('hidden'); for (const p of [1, 2]) { fighters[p].hold = false; fighters[p].play('2H_Melee_Idle'); } broadcast(); }
 if (new URLSearchParams(location.search).get('mode') === 'local') $('mLocal').onclick();
 
 // ---------------- loop ----------------
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 1 ? 62 : 42; camera.updateProjectionMatrix(); }
+function resize0() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 1 ? 62 : 42; camera.updateProjectionMatrix(); }
+function resize() { resize0(); layoutHalves(); }
 addEventListener('resize', resize); resize();
+function fpActive() { return VIEW === 'split' && !['lobby'].includes(state.phase) && fighters[1]; }
+function halves() { // viewport rects in CSS px; landscape = left/right, portrait = top/bottom
+  const w = innerWidth, h = innerHeight;
+  if (state.mode === 'remote') return { [IS_GUEST ? 2 : 1]: [0, 0, w, h] };
+  return w >= h ? { 1: [0, 0, w / 2, h], 2: [w / 2, 0, w / 2, h] } : { 1: [0, 0, w, h / 2], 2: [0, h / 2, w, h / 2] };
+}
+function layoutHalves() {
+  const on = fpActive(); document.body.classList.toggle('split', !!on); document.body.classList.toggle('portrait', innerWidth < innerHeight);
+  for (const p of [1, 2]) { const el = $('vh' + p); const r = on && halves()[p]; el.classList.toggle('hidden', !r); if (r) Object.assign(el.style, { left: r[0] + 'px', top: r[1] + 'px', width: r[2] + 'px', height: r[3] + 'px' }); }
+  $('divider').classList.toggle('hidden', !(on && state.mode !== 'remote'));
+}
+function updFpCams(dt) {
+  for (const p of [1, 2]) {
+    const me = fighters[p], op = fighters[other(p)]; if (!me || !me.head) continue;
+    const hp = new THREE.Vector3(); me.head.getWorldPosition(hp);
+    const fwd = p === 1 ? 1 : -1;
+    const want = new THREE.Vector3(me.root.position.x - fwd * 0.55, hp.y + 0.55, 0.12 * fwd); // just behind the eyes, slightly above: own arms + sword in view
+    const oh = new THREE.Vector3(); op.head.getWorldPosition(oh);
+    const look = new THREE.Vector3(oh.x, oh.y - 0.15, 0);
+    const k = fpPos[p].lengthSq() ? 1 - Math.exp(-dt * 10) : 1;
+    fpPos[p].lerp(want, k); fpLook[p].lerp(look, k);
+    const sh = state.shake || 0; const c = fpCam[p];
+    c.position.copy(fpPos[p]).add(new THREE.Vector3((Math.random() - 0.5) * sh * 0.5, (Math.random() - 0.5) * sh * 0.5, 0));
+    c.lookAt(fpLook[p]);
+  }
+}
+function renderAll(dt) {
+  if (!fpActive()) { renderer.setScissorTest(false); renderer.setViewport(0, 0, innerWidth, innerHeight); renderer.render(scene, camera); return; }
+  updFpCams(dt);
+  const H = innerHeight, rs = halves(); renderer.setScissorTest(true);
+  for (const p of Object.keys(rs)) { const [x, y, w, h] = rs[p]; const c = fpCam[p]; c.aspect = w / h; c.fov = w / h < 0.8 ? 80 : 68; c.updateProjectionMatrix();
+    renderer.setViewport(x, H - y - h, w, h); renderer.setScissor(x, H - y - h, w, h); renderer.render(scene, c); }
+  renderer.setScissorTest(false);
+}
+$('viewBtn').onclick = () => { VIEW = VIEW === 'split' ? 'shared' : 'split'; localStorage.setItem('sdr-view', VIEW); $('viewBtn').textContent = VIEW === 'split' ? '👀' : '🎥'; layoutHalves(); };
+$('viewBtn').textContent = VIEW === 'split' ? '👀' : '🎥';
 const timer = new Timer(); let tAcc = 0;
 const tmp = new THREE.Vector3();
 renderer.setAnimationLoop((ts) => {
@@ -326,7 +372,8 @@ renderer.setAnimationLoop((ts) => {
   else if (state.phase === 'block') { state.t -= dt; $('timerfill').style.width = (100 * state.t / BLOCK_WIN) + '%'; if (state.t <= 0) resolve(null); }
   else if (state.phase === 'result') { state.t -= dt; if (state.t <= 0) afterResult(); }
   // arrow follows attacker head
-  if (!$('arrow').classList.contains('hidden') && fighters[state.arrowP]) { tmp.set(fighters[state.arrowP].baseX * 0.6, 2.7, 0).project(camera); const ar = $('arrow'); ar.style.left = ((tmp.x + 1) / 2 * innerWidth) + 'px'; ar.style.top = ((1 - tmp.y) / 2 * innerHeight) + 'px'; }
+  if (!$('arrow').classList.contains('hidden') && fpActive()) { const r = halves()[other(state.arrowP)] || halves()[state.arrowP]; const ar = $('arrow'); ar.style.left = (r[0] + r[2] / 2) + 'px'; ar.style.top = (r[1] + r[3] * 0.32) + 'px'; }
+  else if (!$('arrow').classList.contains('hidden') && fighters[state.arrowP]) { tmp.set(fighters[state.arrowP].baseX * 0.6, 2.7, 0).project(camera); const ar = $('arrow'); ar.style.left = ((tmp.x + 1) / 2 * innerWidth) + 'px'; ar.style.top = ((1 - tmp.y) / 2 * innerHeight) + 'px'; }
   if (dizzy.visible) { dizzy.userData.t -= dt; const f = fighters[dizzy.userData.p]; dizzy.position.set(f.root.position.x, 2.25, 0); dizzy.rotation.y += dt * 6; if (dizzy.userData.t <= 0) dizzy.visible = false; }
   updParts(dt);
   scene.traverse((o) => { if (o.userData.flag) { const pos = o.geometry.attributes.position; for (let i = 0; i < pos.count; i++) { const x = pos.getX(i); pos.setZ(i, Math.sin(tAcc * 3 + x * 3 + o.userData.s) * 0.12 * (x + 0.5)); } pos.needsUpdate = true; } if (o.userData.cloud) o.position.x += o.userData.cloud * dt; });
@@ -335,7 +382,7 @@ renderer.setAnimationLoop((ts) => {
   const orbit = state.phase === 'lobby' ? Math.sin(tAcc * 0.25) * 2.5 : Math.sin(tAcc * 0.3) * 0.4;
   camera.position.set(camHome.x + orbit + (Math.random() - 0.5) * sh, camHome.y + (Math.random() - 0.5) * sh, camHome.z);
   camera.lookAt(camLook);
-  renderer.render(scene, camera);
+  renderAll(dt);
 });
 
 loadFighters().then(() => { $('loading').remove(); state.ready = true; }).catch((e) => { console.error(e); $('loading').textContent = '⚠️ ' + e.message; });
