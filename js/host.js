@@ -460,7 +460,8 @@ if (IS_GUEST) startGuest(); else startPeer();
 // own-perspective side -> world z: 1P faces +x (right = +z), 2P faces -x (right = -z)
 function sideZ(p, dir) { return (dir === 'R' ? 1 : -1) * (p === 1 ? 1 : -1); }
 function dodge(f, dir, ok) { f.dz = { t: 0, amt: sideZ(f.p, dir) * (ok ? 1.0 : 0.45) }; if (ok) f.play(dir === 'R' ? 'Dodge_Right' : 'Dodge_Left', { once: true, speed: 1.2 }); }
-function faceTex(txt, bg, fg) { const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); x.fillStyle = bg; x.beginPath(); x.arc(128, 128, 126, 0, 7); x.fill(); x.strokeStyle = '#b8860b'; x.lineWidth = 14; x.beginPath(); x.arc(128, 128, 112, 0, 7); x.stroke(); x.fillStyle = fg; x.font = 'bold 150px "Noto Sans TC","PingFang HK",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 128, 138); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+function faceTex(txt, bg, fg) { const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); x.fillStyle = bg; x.beginPath(); x.arc(128, 128, 126, 0, 7); x.fill(); x.strokeStyle = '#b8860b'; x.lineWidth = 14; x.beginPath(); x.arc(128, 128, 112, 0, 7); x.stroke(); x.fillStyle = fg; x.font = 'bold 150px "Noto Sans TC","PingFang HK",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 128, 138); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.center.set(0.5, 0.5); t.rotation = COIN_ROT; return t; }
+const COIN_ROT = +(new URLSearchParams(location.search).get('cr') || -Math.PI / 2);
 const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.07, 48), [
   new THREE.MeshStandardMaterial({ color: 0xd4a017, metalness: 0.9, roughness: 0.3 }),
   new THREE.MeshStandardMaterial({ map: faceTex('正', '#ffd54a', '#a0522d'), metalness: 0.6, roughness: 0.35 }),

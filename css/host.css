@@ -73,6 +73,6 @@ kbd{display:inline-block;background:#fff;color:#222;border-radius:8px;padding:4p
 .cue.def.L .danger{left:0}.cue.def.R .danger{right:0;background:linear-gradient(270deg,#ff000088,#ff000000)}
 .cue.def.R .danger{transform:scaleX(-1)}
 @keyframes flash{from{opacity:.55}to{opacity:1}}
-#coinTxt{position:fixed;left:50%;top:70%;transform:translate(-50%,-50%);font-size:clamp(26px,4.5vw,48px);font-weight:900;background:#000a;border:4px solid #ffd54a;border-radius:24px;padding:10px 24px;white-space:nowrap;animation:pop .35s;text-shadow:0 3px 0 #000}
+#coinTxt{position:fixed;left:50%;top:16%;transform:translate(-50%,-50%);font-size:clamp(26px,4.5vw,48px);font-weight:900;background:#000a;border:4px solid #ffd54a;border-radius:24px;padding:10px 24px;white-space:nowrap;animation:pop .35s;text-shadow:0 3px 0 #000}
 #coinTxt .p1c{color:#7fb2ff}#coinTxt .p2c{color:#ff8a8a}
 .split #arrow{display:none}
